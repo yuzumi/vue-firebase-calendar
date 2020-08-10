@@ -221,6 +221,15 @@ export default {
       this.selectedOpen = false;
       this.currentlyEditing = null;
     },
+    async deleteEvent(eventId) {
+      await firestore
+        .collection('events')
+        .doc(eventId)
+        .delete();
+
+      this.selectedOpen = false;
+      await this.getEvents();
+    },
     updateRange({ start, end }) {
       const events = [];
 

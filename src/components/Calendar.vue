@@ -3,27 +3,19 @@
     <v-col>
       <v-sheet height="64">
         <v-toolbar flat color="white">
-          <v-btn outlined class="mr-4" color="grey darken-2" @click="setToday">
-            Today
-          </v-btn>
+          <v-btn color="primary" class="mr-4" @click="dialog = true" dark>New Event</v-btn>
+          <v-btn outlined class="mr-4" color="grey darken-2" @click="setToday">Today</v-btn>
           <v-btn fab text small color="grey darken-2" @click="prev">
             <v-icon small>mdi-chevron-left</v-icon>
           </v-btn>
           <v-btn fab text small color="grey darken-2" @click="next">
             <v-icon small>mdi-chevron-right</v-icon>
           </v-btn>
-          <v-toolbar-title v-if="$refs.calendar">
-            {{ $refs.calendar.title }}
-          </v-toolbar-title>
+          <v-toolbar-title v-if="$refs.calendar">{{ $refs.calendar.title }}</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-menu bottom right>
             <template v-slot:activator="{ on, attrs }">
-              <v-btn
-                outlined
-                color="grey darken-2"
-                v-bind="attrs"
-                v-on="on"
-              >
+              <v-btn outlined color="grey darken-2" v-bind="attrs" v-on="on">
                 <span>{{ typeToLabel[type] }}</span>
                 <v-icon right>mdi-menu-down</v-icon>
               </v-btn>
@@ -45,6 +37,27 @@
           </v-menu>
         </v-toolbar>
       </v-sheet>
+
+      <v-dialog v-model="dialog" max-width="480">
+        <v-card>
+          <v-container>
+            <v-form @submit.prevent="addEvent">
+              <v-text-field v-model="event.name" type="text" label="Event name *" />
+              <v-text-field v-model="event.details" type="text" label="Detail" />
+              <v-text-field v-model="event.start" type="date" label="Start *" />
+              <v-text-field v-model="event.end" type="date" label="End *" />
+              <v-text-field v-model="event.color" type="color" label="Color" />
+              <v-btn
+                color="primary"
+                class="mr-4"
+                type="submit"
+                @click.stop="dialog = false"
+              >Create Event</v-btn>
+            </v-form>
+          </v-container>
+        </v-card>
+      </v-dialog>
+
       <v-sheet height="600">
         <v-calendar
           ref="calendar"
@@ -64,15 +77,8 @@
           :activator="selectedElement"
           offset-x
         >
-          <v-card
-            color="grey lighten-4"
-            min-width="350px"
-            flat
-          >
-            <v-toolbar
-              :color="selectedEvent.color"
-              dark
-            >
+          <v-card color="grey lighten-4" min-width="350px" flat>
+            <v-toolbar :color="selectedEvent.color" dark>
               <v-btn icon @click="deleteEvent(selectedEvent.id)">
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
@@ -80,9 +86,7 @@
               <v-spacer></v-spacer>
             </v-toolbar>
             <v-card-text>
-              <form v-if="currentlyEditing !== selectedEvent.id">
-                {{ selectedEvent.details }}
-              </form>
+              <form v-if="currentlyEditing !== selectedEvent.id">{{ selectedEvent.details }}</form>
               <form v-else>
                 <textarea-autosize
                   v-model="selectedEvent.details"
@@ -94,27 +98,13 @@
               </form>
             </v-card-text>
             <v-card-actions>
-              <v-btn
-                text
-                color="secondary"
-                @click="selectedOpen = false"
-              >
-                Close
-              </v-btn>
+              <v-btn text color="secondary" @click="selectedOpen = false">Close</v-btn>
               <v-btn
                 text
                 v-if="currentlyEditing !== selectedEvent.id"
                 @click.prevent="editEvent(selectedEvent)"
-              >
-                Edit
-              </v-btn>
-              <v-btn
-                text
-                v-else
-                @click.prevent="updateEvent(selectedEvent)"
-              >
-                Save
-              </v-btn>
+              >Edit</v-btn>
+              <v-btn text v-else @click.prevent="updateEvent(selectedEvent)">Save</v-btn>
             </v-card-actions>
           </v-card>
         </v-menu>
@@ -128,6 +118,14 @@ import { firestore } from '@/main';
 
 const today = () => new Date().toISOString().substr(0, 10);
 
+const defaultEvent = () => ({
+  name: null,
+  details: null,
+  start: null,
+  end: null,
+  color: '#0095dd',
+});
+
 export default {
   name: 'Calendar',
   data: () => ({
@@ -140,13 +138,7 @@ export default {
       day: 'Day',
       '4day': '4 Days',
     },
-    event: {
-      name: null,
-      details: null,
-      start: null,
-      end: null,
-      color: '#0095dd',
-    },
+    event: defaultEvent(),
     currentlyEditing: false,
     selectedEvent: {},
     selectedElement: null,
@@ -195,7 +187,9 @@ export default {
         this.selectedEvent = event;
         this.selectedElement = nativeEvent.target;
 
-        setTimeout(() => { this.selectedOpen = true; }, 10);
+        setTimeout(() => {
+          this.selectedOpen = true;
+        }, 10);
       };
 
       if (this.selectedOpen) {
@@ -209,6 +203,16 @@ export default {
     },
     editEvent(event) {
       this.currentlyEditing = event.id;
+    },
+    async addEvent() {
+      if (this.event.name && this.event.start && this.event.end) {
+        await firestore
+          .collection('events')
+          .add(this.event);
+
+        await this.getEvents();
+        this.event = defaultEvent();
+      }
     },
     async updateEvent(event) {
       await firestore
